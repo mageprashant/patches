@@ -1,0 +1,66 @@
+diff --git a/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregatorInterface.php b/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregatorInterface.php
+index 205585264739..5c9f2d0caa13 100644
+--- a/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregatorInterface.php
++++ b/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregatorInterface.php
+@@ -80,6 +80,13 @@ interface ProcessingErrorAggregatorInterface
+     public function initValidationStrategy($validationStrategy, $allowedErrorCount = 0);
+
+     /**
++     * Return the validation strategy
++     *
++     * @return string
++     */
++    public function getValidationStrategy();
++
++    /**
+      * Check if the further processing should be stopped
+      *
+      * @return bool
+diff --git a/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregator.php b/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregator.php
+index 079b2e60c478..b0d537867f57 100644
+--- a/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregator.php
++++ b/vendor/magento/module-import-export/Model/Import/ErrorProcessing/ProcessingErrorAggregator.php
+@@ -178,6 +178,14 @@ class ProcessingErrorAggregator implements ProcessingErrorAggregatorInterface
+     }
+
+     /**
++     * @return string $validationStrategy
++     */
++    public function getValidationStrategy()
++    {
++        return $this->validationStrategy;
++    }
++
++    /**
+      * @return bool
+      */
+     public function hasToBeTerminated()
+diff --git a/vendor/magento/module-import-export/Model/Import.php b/vendor/magento/module-import-export/Model/Import.php
+index 092b721b8243..8916914fc7a6 100644
+--- a/vendor/magento/module-import-export/Model/Import.php
++++ b/vendor/magento/module-import-export/Model/Import.php
+@@ -278,7 +278,10 @@ class Import extends \Magento\ImportExport\Model\AbstractModel
+     {
+         $messages = [];
+         if ($this->getProcessedRowsCount()) {
+-            if ($validationResult->getErrorsCount()) {
++            if (($validationResult->getErrorsCount() &&
++                $validationResult->getValidationStrategy() === ProcessingErrorAggregatorInterface::VALIDATION_STRATEGY_STOP_ON_ERROR) ||
++                ($validationResult->getErrorsCount() > $validationResult->getAllowedErrorsCount() &&
++                $validationResult->getValidationStrategy() === ProcessingErrorAggregatorInterface::VALIDATION_STRATEGY_SKIP_ERRORS)) {
+                 $messages[] = __('Data validation failed. Please fix the following errors and upload the file again.');
+
+                 // errors info
+@@ -574,7 +577,10 @@ class Import extends \Magento\ImportExport\Model\AbstractModel
+         $messages = $this->getOperationResultMessages($errorAggregator);
+         $this->addLogComment($messages);
+
+-        $result = !$errorAggregator->getErrorsCount();
++               $result = ($errorAggregator->getValidationStrategy() === ProcessingErrorAggregatorInterface::VALIDATION_STRATEGY_STOP_ON_ERROR) ?
++                        !$errorAggregator->getErrorsCount() :
++                        $errorAggregator->getErrorsCount() <= $errorAggregator->getAllowedErrorsCount();
++
+         if ($result) {
+             $this->addLogComment(__('Import data validation is complete.'));
+         }
+\ No newline at end of file		 
